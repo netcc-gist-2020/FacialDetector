@@ -20,7 +20,7 @@ async def accept(websocket, path):
                 current_exp = result
 
                 try:
-                    msg = {'absence': result[0], 'exp': result[1], 'eye_dir': result[2]}
+                    msg = {'type': 'exp', 'data': {'absence': result[0], 'expression': result[1], 'eye_dir': result[2]}}
 
                     print(msg)
 
