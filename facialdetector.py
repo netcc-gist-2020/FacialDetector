@@ -33,9 +33,9 @@ class FacialDetector:
         self.absence_time = -1
         self.absence_thres_time = 2
 
-        self.sleepy_thres_frames = 3
+        self.sleepy_thres_frames = 600
         self.mean_eye_ratio = 0
-        self.sleepy_buffer = -np.ones(600)   # save recent 10 frames here
+        self.sleepy_buffer = -np.ones(6000)   # save recent 10 frames here
         self.sleepy_buffer_pt = 0   # next location pointer
 
         self.exp_labels = ('angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral')
@@ -70,10 +70,8 @@ class FacialDetector:
                 x,y,w,h = face.left(), face.top(), face.right() - face.left(), face.bottom() - face.top()
                 cv2.rectangle(self.frame, (x, y), (x+w, y+h), (255, 0, 0), 3)
 
-                if self.detect_sleepy(face):
-                    return tuple(['present', "sleepy", None])
-                else:
-                    return tuple(['present', self.detect_expression(face), self.detect_gazing(face)])
+                sleepy = self.detect_sleepy(face)
+                return tuple(['present', self.detect_expression(face) if not sleepy else "sleepy", self.detect_gazing(face)])
 
 
     def detect_absence(self):
@@ -185,13 +183,10 @@ class FacialDetector:
         cv2.rectangle(self.frame, tuple([hull[0,0]-f, hull[0,1]-d]), tuple([hull[1,0]+f, hull[1,1]+d]), (255, 0, 0), 1)
 
         eye_gray = self.gray[hull[0,1]-d:hull[1,1]+d, hull[0,0]-f:hull[1,0]+f]
-        #eye_gray = cv2.GaussianBlur(eye_gray, (5,5), 0)
         eye_gray = cv2.bilateralFilter(eye_gray, 10, 15, 15)
         cv2.imshow("eye",eye_gray)
 
         hist = np.histogram(eye_gray.reshape(-1), bins=20)
-        #plt.hist(eye_gray.reshape(-1), bins=20)
-        #plt.show()
         thres = np.min(sorted(hist, key= lambda x: -x[0])[1][:3]) + 5
 
         #print(thres)
