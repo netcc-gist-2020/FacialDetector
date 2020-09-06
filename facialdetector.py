@@ -5,6 +5,8 @@ import math
 import time
 import json
 
+import matplotlib.pyplot as plt
+
 from tensorflow.keras.models import load_model, model_from_json
 from keras.preprocessing.image import img_to_array
 
@@ -36,7 +38,7 @@ class FacialDetector:
         self.sleepy_buffer = -np.ones(600)   # save recent 10 frames here
         self.sleepy_buffer_pt = 0   # next location pointer
 
-        self.exp_labels = {0: 'angry', 1:'disgust', 2:'fear', 3:'happy', 4:'neutral', 5:'sad', 6:'surprise'}
+        self.exp_labels = ('angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral')
 
 
     def set_frame(self, frame):
@@ -188,7 +190,9 @@ class FacialDetector:
         cv2.imshow("eye",eye_gray)
 
         hist = np.histogram(eye_gray.reshape(-1), bins=20)
-        thres = np.min(sorted(hist, key= lambda x: -x[0])[1][:2]) + 5
+        #plt.hist(eye_gray.reshape(-1), bins=20)
+        #plt.show()
+        thres = np.min(sorted(hist, key= lambda x: -x[0])[1][:3]) + 5
 
         #print(thres)
         
@@ -254,7 +258,10 @@ def start():
 
     detector = dlib.get_frontal_face_detector()
     landmarker = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
-    exp_classifier = load_model('model_v6_23.hdf5')
+    #exp_classifier = load_model('model_v6_23.hdf5')
+    exp_classifier = model_from_json(open("facial_expression_model_structure.json", "r").read())
+    exp_classifier.load_weights('facial_expression_model_weights.h5')
+
     facerec = dlib.face_recognition_model_v1('dlib_face_recognition_resnet_model_v1.dat')
 
     facial_detector = FacialDetector(detector=detector, landmarker=landmarker, exp_classifier=exp_classifier, facerec=facerec)
