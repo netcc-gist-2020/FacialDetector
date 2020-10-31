@@ -16,6 +16,12 @@ def euc_dist(x1, y1, x2, y2):
 def landmarks_dist(n1, n2, landmarks):
     return euc_dist(landmarks.part(n1).x, landmarks.part(n1).y, landmarks.part(n2).x, landmarks.part(n2).y)
 
+
+def gate(func, threshold):
+
+
+
+
 class FacialDetector:
 
     def __init__(self, detector, landmarker, exp_classifier, facerec):
@@ -25,18 +31,15 @@ class FacialDetector:
         self.facerec = facerec 
 
         self.gray = None
-        #self.faces = None
         self.frame = None
 
+        # face descriptors from server
+        self.target_face_descriptor = None
+        # self.detector result
         self.target_face = None
-
-        self.absence_time = -1
-        self.absence_thres_time = 2
-
-        self.sleepy_thres_frames = 600
         self.mean_eye_ratio = 0
-        self.sleepy_buffer = -np.ones(6000)   # save recent 10 frames here
-        self.sleepy_buffer_pt = 0   # next location pointer
+
+        self.face_buffer = []
 
         self.exp_labels = ('angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral')
 
@@ -44,8 +47,66 @@ class FacialDetector:
     def set_frame(self, frame):
         self.frame = frame
         self.gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
 
+
+
+    async def detect_timer(self, func, buffer_size, sleeptime):
+        # notify on init, and when the result changes (after some threshold)
+
+        count = 0
+
+        result = func(self.target_face)
+        buf = [result]
+
+        await asyncio.sleep(sleeptime)
+
+        while True:
+            current_result = func(self.target_face)
+
+            buf.append(current_result)
+            buf = buf[-buffer_size:]
+
+            if buf.count(current_result) > buf.count(result) and len(buf) == buffer_size:
+                result = current_result
+                return result
+
+            await asyncio.sleep(sleeptime)
+
+
+
+    async def find_target(self):
+        gray = self.gray
+        
+        if self.target_face != None:
+            hrange = range(max(face.left()-200,0), min(face.right()+200,0))
+            wrange = range(max(face.top()-200,0), min(face.bottom()+200,0))
+
+            faces = self.detector(self.gray[hrange][:,wrange])
+
+
+        else:
+            hrange = range(gray.shape[0])
+            wrange = range(gray.shape[1])
+
+            faces = self.detector(self.gray[hrange][:,wrange])
+            tasks = []
+
+            for face in faces:
+                tasks.append(asyncio.ensure_future(compare_face_target(face)))
+
+            task_monitor = asyncio.ensure_future(compare_face_target_monitor(0.05))
+            await task_monitor
+
+
+    async def run():
+        task_target = asyncio.ensure_future(find_target())
+
+        task_exp = asyncio.ensure_future(detect_timer(self.detect_expression, 4, 0.6))
+        task_sleepy = asyncio.ensure_future(detect_timer(self.detect_sleepy, 10, 1.2))
+        task_gazing = asyncio.ensure_future(detect_timer(self.detect_gazing, 3, 0.5))
+
+        
+    """
     def detect(self):
         # TODO: implement facial recognition, and only detect a specific face
         faces = self.detector(self.gray)
@@ -61,18 +122,12 @@ class FacialDetector:
                     #return None
 
 
-                #if not self.compare_face_target(face):
-                #    continue
-
                 self.absence_time = -1
-
-                # display rectangle
-                x,y,w,h = face.left(), face.top(), face.right() - face.left(), face.bottom() - face.top()
-                cv2.rectangle(self.frame, (x, y), (x+w, y+h), (255, 0, 0), 3)
 
                 sleepy = self.detect_sleepy(face)
                 return tuple(['present', self.detect_expression(face) if not sleepy else "sleepy", self.detect_gazing(face)])
-
+    """
+    """
 
     def detect_absence(self):
         if self.absence_time == -1:
@@ -85,25 +140,44 @@ class FacialDetector:
                 return "absence"
             else:
                 return "unseen"
+    """
 
-    def get_descriptor(self, face):
+    async def compare_face_target_monitor(self, timer):
+        while True:
+            if len(self.face_buffer) > 0:
+                best_face_info = sorted(self.face_buffer, key = lambda x: x[0])[0]
+                face = best_face_info[1]
+                desc = best_face_info[2]
+
+                #self.target_face_descriptor = desc     # don't touch this
+                self.target_face = face
+
+
+            await asyncio.sleep(0.1)
+
+    async def compare_face_target(self, face):
+        desc = await self.get_descriptor(face)
+        dist = np.linalg.norm(np.array(desc) - np.array(self.target_face_descriptor))
+
+        if dist < 0.6:
+            # True
+            self.face_buffer.append((dist, face, desc))
+            return True
+
+        else:
+            # False
+            return False
+
+    async def get_descriptor(self, face):
         landmarks = self.landmarker(self.gray, face)
         face_descriptor = self.facerec.compute_face_descriptor(self.frame, landmarks)
 
         return face_descriptor
 
-    def init_face_descriptor(self,face):
-        self.target_face = self.get_descriptor(face)
 
-    def compare_face_target(self, face):
-        #print(np.array(self.get_descriptor(face)))
+    async def init_face_descriptor(self, face):
+        self.target_face_descriptor = await self.get_descriptor(face)
 
-        dist = np.linalg.norm(np.array(self.get_descriptor(face)) - np.array(self.target_face))
-
-        if dist < 0.6:
-            return True
-        else:
-            return False
 
     def detect_expression(self, face):
         x,y,w,h = face.left(), face.top(), face.right() - face.left(), face.bottom() - face.top()
@@ -123,7 +197,7 @@ class FacialDetector:
 
         return label
 
-
+    """
     def detect_sleepy(self, face):
         self.record_sleepy(face)
 
@@ -139,6 +213,7 @@ class FacialDetector:
                 return True
             else:
                 return False
+    """
 
 
     def detect_gazing(self, face):
@@ -222,13 +297,6 @@ class FacialDetector:
             self.mean_eye_ratio = np.mean(self.sleepy_buffer[:10])
             #print(self.mean_eye_ratio)
 
-        
-
-
-    def record_sleepy(self, face):
-        self.sleepy_buffer[self.sleepy_buffer_pt] = self.compute_eye_ratio(face)
-        self.sleepy_buffer_pt = (self.sleepy_buffer_pt + 1) % self.sleepy_buffer.shape[0]
-
 
     def compute_eye_ratio(self, face):
         landmarks = self.landmarker(self.gray, face)
@@ -244,6 +312,15 @@ class FacialDetector:
         right_eye_ratio = (right_eye_height1 + right_eye_height2) / right_eye_width*2
 
         return right_eye_ratio + left_eye_ratio
+        
+    """
+
+    def record_sleepy(self, face):
+        self.sleepy_buffer[self.sleepy_buffer_pt] = self.compute_eye_ratio(face)
+        self.sleepy_buffer_pt = (self.sleepy_buffer_pt + 1) % self.sleepy_buffer.shape[0]
+    """
+
+    
 
 
 
