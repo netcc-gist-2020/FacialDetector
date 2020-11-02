@@ -3,15 +3,20 @@ import asyncio
 results = []
 
 async def async_generator(t):
-	await asyncio.sleep(t)
-	results.append(t)
-	return t
+	while True:
+		await asyncio.sleep(t)
+		print(t)
+		results.append(t)
+		
+	#return t
 
 async def monitor():
 	while True:
-		print("asdf")
+		
 		if len(results) > 0:
+			print(results)
 			return True
+
 		await asyncio.sleep(0.1)
 
 async def main():
@@ -22,9 +27,11 @@ async def main():
 	monitor_task = asyncio.ensure_future(monitor())
 
 	#await asyncio.gather(task1, task2)
-	await monitor_task
-
-	print(results)
+	while True:
+		#await monitor_task
+		#results.clear()
+		#monitor_task = asyncio.ensure_future(monitor())
+		await asyncio.sleep(0.0001)
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
