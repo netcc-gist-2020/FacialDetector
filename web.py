@@ -35,11 +35,17 @@ async def accept(websocket, path):
     user_name = await websocket.recv()
     user_name = user_name.strip()
     # print("receive: " + user_name)
-    while True:
-        result = facialdetector.run(cap, facial_detector)
 
-        if result != None:
-            if not onCamera and result[0] == 'present':
+    facial_detector = start()
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(facial_detector.run())
+
+    while True:
+        result = facial_detector.info
+
+        if True: #result != None:
+            if not onCamera and result["absence"] == 'present':
                 onCamera = True
                 ret, frame = cap.read()
 
@@ -60,14 +66,13 @@ async def accept(websocket, path):
                     print("type error")
                     pass
 
-            elif result[0] == 'absence':
+            elif result["absence"] == 'absence':
                 onCamera = False
 
-            if current_exp != result:
-                current_exp = result
+            if facial_detector.updated == True:
 
                 try:
-                    msg = {'type': 'exp', 'data': {'absence': result[0], 'expression': result[1], 'eye_dir': result[2], 'isSpy': isSpy}}
+                    msg = {'type': 'exp', 'data': {'absence': result["absence"], 'expression': result["expression"], 'eye_dir': result["eye_dir"], 'sleepiness': result["sleepiness"], 'isSpy': isSpy}}
 
                     # print(msg)
 

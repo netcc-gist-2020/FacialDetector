@@ -44,6 +44,8 @@ class FacialDetector:
         self.face_buffer = []
         self.info = {"absence": None, "expression": None, "eye_dir": None, "sleepiness": None}
 
+        self.updated = True
+
 
         self.exp_labels = ('happy', 'neutral') #('angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral')
 
@@ -77,6 +79,7 @@ class FacialDetector:
                         result = current_result
 
                         print(current_result)
+                        self.updated = True
 
                     self.info[info_name] = result
 
