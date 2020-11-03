@@ -63,7 +63,7 @@ class FacialDetector:
             buf = np.array([result])
             self.info[info_name] = result
             
-            print(result)
+            # print(result)
         except:
             result = None
             buf = np.array([])
@@ -163,13 +163,13 @@ class FacialDetector:
 
 
         task_absence = asyncio.ensure_future(self.detect_timer(lambda x: "absence" if x==None else "present", 
-                                                                "absence", 120, 1))
+                                                                "absence", 3, 1))
 
-        task_exp = asyncio.ensure_future(self.detect_timer(self.detect_expression, "expression", 20, 0.5))
+        task_exp = asyncio.ensure_future(self.detect_timer(self.detect_expression, "expression", 5, 0.5))
 
-        task_gazing = asyncio.ensure_future(self.detect_timer(self.detect_gazing, "eye_dir", 8, 0.5))
+        task_gazing = asyncio.ensure_future(self.detect_timer(self.detect_gazing, "eye_dir", 5, 0.5))
 
-        task_sleepy = asyncio.ensure_future(self.detect_timer(self.detect_sleepy,"sleepiness", 60, 1))
+        task_sleepy = asyncio.ensure_future(self.detect_timer(self.detect_sleepy,"sleepiness", 3, 1))
         #task
 
 
@@ -297,9 +297,9 @@ class FacialDetector:
 
         if detection_success > 0:
             if ratio < 0.30*detection_success:
-                return "left"
-            elif ratio > 0.60*detection_success:
                 return "right"
+            elif ratio > 0.60*detection_success:
+                return "left"
             else:
                 return "center"
         else:

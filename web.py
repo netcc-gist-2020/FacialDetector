@@ -28,7 +28,6 @@ async def spy_check(user_name, img):
 
 async def accept(websocket, path):
     #cap, facial_detector = facialdetector.start()
-    current_exp = None
     onCamera = False
     isSpy = True
     
@@ -46,44 +45,42 @@ async def accept(websocket, path):
 
     while True:
         result = facial_detector.info
+        if not onCamera and result["absence"] == 'present':
+            onCamera = True
+            ret, frame = cap.read()
 
-        if True: #result != None:
-            if not onCamera and result["absence"] == 'present':
-                onCamera = True
-                ret, frame = cap.read()
+            if ret == False:
+                continue
+            encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
+            _, imgencode = cv2.imencode('.jpg', frame, encode_param)
+            stringImg = imgencode.tobytes()
+            
+            # spy_check doesn't work with late response
+            isSpy = await spy_check(user_name, stringImg)
 
-                if ret == False:
-                    continue
-                encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
-                _, imgencode = cv2.imencode('.jpg', frame, encode_param)
-                stringImg = imgencode.tobytes()
+            try:
+                msg = {'type':'spy', 'data': {'img': "spy"}}
+                print(msg)
+                await websocket.send(json.dumps(msg))
+            except TypeError:
+                print("type error")
+                pass
+
+        elif result["absence"] == 'absence':
+            onCamera = False
+
+        if facial_detector.updated == True:
+            try:
+                msg = {'type': 'exp', 'data': {'absence': result["absence"], 'expression': result["expression"], 'eye_dir': result["eye_dir"], 'sleepiness': result["sleepiness"], 'isSpy': isSpy}}
+
+                print(msg)
+
+                await websocket.send(json.dumps(msg))
                 
-                # spy_check doesn't work with late response
-                isSpy = await spy_check(user_name, stringImg)
+            except TypeError:
+                pass
 
-                try:
-                    msg = {'type':'spy', 'data': {'img': "spy"}}
-                    print(msg)
-                    await websocket.send(json.dumps(msg))
-                except TypeError:
-                    print("type error")
-                    pass
-
-            elif result["absence"] == 'absence':
-                onCamera = False
-
-            if facial_detector.updated == True:
-                try:
-                    msg = {'type': 'exp', 'data': {'absence': result["absence"], 'expression': result["expression"], 'eye_dir': result["eye_dir"], 'sleepiness': result["sleepiness"], 'isSpy': isSpy}}
-
-                    # print(msg)
-
-                    await websocket.send(json.dumps(msg))
-                    
-                except TypeError:
-                    pass
-
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(1)
 
 if __name__ == "__main__":
     websoc_svr = websockets.serve(accept, "localhost", 3000)
