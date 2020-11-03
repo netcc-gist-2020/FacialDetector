@@ -152,10 +152,31 @@ class FacialDetector:
     def detect_sleepy(self, face):
         try:
             y=self.compute_eye_ratio(face)
+            print(y)
         except:
             raise ValueError("detect_sleepy: No face detected")
 
-        return "sleepy" if y<1.4 else "awake"
+        return "sleepy" if y<0.8*self.mean_eye_ratio else "awake"
+
+
+    async def init_mean_eye_ratio(self,  buffer_size, timer):
+        s = 0
+        i = 0
+
+        while i < buffer_size:
+            frame = self.cap.read()[1]
+            self.set_frame(frame)
+
+            try:
+                s += self.compute_eye_ratio(self.target_face)
+                i += 1 
+            except:
+                pass
+
+            await asyncio.sleep(timer)
+
+        print(s/buffer_size)
+        return s / buffer_size
 
 
     async def run(self):
@@ -169,9 +190,9 @@ class FacialDetector:
 
         task_gazing = asyncio.ensure_future(self.detect_timer(self.detect_gazing, "eye_dir", 5, 0.5))
 
-        task_sleepy = asyncio.ensure_future(self.detect_timer(self.detect_sleepy,"sleepiness", 3, 1))
-        #task
+        self.mean_eye_ratio = await self.init_mean_eye_ratio(10, 0.2)
 
+        task_sleepy = asyncio.ensure_future(self.detect_timer(self.detect_sleepy,"sleepiness", 3, 1))
 
         while True:
             frame = self.cap.read()[1]
