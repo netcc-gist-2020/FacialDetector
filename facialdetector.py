@@ -45,7 +45,7 @@ class FacialDetector:
         self.info = {"absence": None, "expression": None, "eye_dir": None, "sleepiness": None}
 
 
-        self.exp_labels = ('angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral')
+        self.exp_labels = ('happy', 'neutral') #('angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral')
 
 
     def set_frame(self, frame):
@@ -160,7 +160,7 @@ class FacialDetector:
         task_absence = asyncio.ensure_future(self.detect_timer(lambda x: "absence" if x==None else "present", 
                                                                 "absence", 120, 1))
 
-        task_exp = asyncio.ensure_future(self.detect_timer(self.detect_expression, "expression", 30, 0.1))
+        task_exp = asyncio.ensure_future(self.detect_timer(self.detect_expression, "expression", 20, 0.5))
 
         task_gazing = asyncio.ensure_future(self.detect_timer(self.detect_gazing, "eye_dir", 8, 0.5))
 
@@ -254,7 +254,7 @@ class FacialDetector:
         roi_gray = img_to_array(roi_gray)
         roi_gray = np.expand_dims(roi_gray, axis=0)
 
-        preds = self.exp_classifier.predict(roi_gray)[0]
+        preds = self.exp_classifier.predict(roi_gray)[0][[3,6]]
         label = self.exp_labels[preds.argmax()]  
 
         return label
