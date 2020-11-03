@@ -7,6 +7,8 @@ async def async_generator(t):
 		await asyncio.sleep(t)
 		print(t)
 		results.append(t)
+
+		return "Ok"
 		
 	#return t
 
@@ -20,7 +22,7 @@ async def monitor():
 		await asyncio.sleep(0.1)
 
 async def main():
-	print(0)
+
 
 	task1 = asyncio.ensure_future(async_generator(5))
 	task2 = asyncio.ensure_future(async_generator(2))
@@ -31,7 +33,7 @@ async def main():
 		#await monitor_task
 		#results.clear()
 		#monitor_task = asyncio.ensure_future(monitor())
-		await asyncio.sleep(0.0001)
+		await task1
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())

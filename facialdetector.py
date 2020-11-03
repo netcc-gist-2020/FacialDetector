@@ -42,7 +42,7 @@ class FacialDetector:
 
 
         self.face_buffer = []
-        self.info = {"absence": None, "expression": None, "eye_dir": None}
+        self.info = {"absence": None, "expression": None, "eye_dir": None, "sleepiness": None}
 
 
         self.exp_labels = ('angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral')
@@ -56,8 +56,13 @@ class FacialDetector:
 
     async def detect_timer(self, func, info_name, buffer_size, sleeptime):
         # notify on init, and when the result changes (after some threshold)
-        buf = np.array([])
-        result = None
+        try:
+            result = func(self.target_face)
+            buf = np.array([result])
+            print(result)
+        except:
+            result = None
+            buf = np.array([])
 
         while True:
             try:
@@ -76,8 +81,8 @@ class FacialDetector:
                     self.info[info_name] = result
 
             except ValueError:
-                print(info_name+ ": ValueError!")
-
+                #print(info_name+ ": ValueError!")
+                pass
             await asyncio.sleep(sleeptime)
 
 
@@ -139,13 +144,28 @@ class FacialDetector:
             await asyncio.sleep(timer)
 
 
+    def detect_sleepy(self, face):
+        try:
+            y=self.compute_eye_ratio(face)
+        except:
+            raise ValueError("detect_sleepy: No face detected")
+
+        return "sleepy" if y<1.4 else "awake"
+
 
     async def run(self):
         task_target = asyncio.ensure_future(self.find_target(0.1))
 
-        task_absence = asyncio.ensure_future(self.detect_timer(lambda x: "absence" if x==None else "present", "absence", 120, 1))
+
+        task_absence = asyncio.ensure_future(self.detect_timer(lambda x: "absence" if x==None else "present", 
+                                                                "absence", 120, 1))
+
         task_exp = asyncio.ensure_future(self.detect_timer(self.detect_expression, "expression", 30, 0.1))
+
         task_gazing = asyncio.ensure_future(self.detect_timer(self.detect_gazing, "eye_dir", 8, 0.5))
+
+        task_sleepy = asyncio.ensure_future(self.detect_timer(self.detect_sleepy,"sleepiness", 60, 1))
+        #task
 
 
         while True:
@@ -157,6 +177,7 @@ class FacialDetector:
             
             cv2.imshow("Frame", self.frame)
             key = cv2.waitKey(1)
+
             if key == 27:
                 break
 
@@ -331,6 +352,9 @@ class FacialDetector:
 
 
     def compute_eye_ratio(self, face):
+        if face == None:
+            raise ValueError("compute_eye_ratio: No face detected")
+
         landmarks = self.landmarker(self.gray, face)
 
         left_eye_width = landmarks_dist(42, 45, landmarks)
