@@ -39,8 +39,10 @@ async def accept(websocket, path):
     facial_detector = facialdetector.start()
     cap = facial_detector.cap
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(facial_detector.run())
+    #loop = asyncio.get_event_loop()
+    #loop.run_until_complete(facial_detector.run())
+
+    asyncio.ensure_future(facial_detector.run())
 
     while True:
         result = facial_detector.info
@@ -71,7 +73,6 @@ async def accept(websocket, path):
                 onCamera = False
 
             if facial_detector.updated == True:
-
                 try:
                     msg = {'type': 'exp', 'data': {'absence': result["absence"], 'expression': result["expression"], 'eye_dir': result["eye_dir"], 'sleepiness': result["sleepiness"], 'isSpy': isSpy}}
 
@@ -81,6 +82,8 @@ async def accept(websocket, path):
                     
                 except TypeError:
                     pass
+
+        await asyncio.sleep(0.01)
 
 if __name__ == "__main__":
     websoc_svr = websockets.serve(accept, "localhost", 3000)
