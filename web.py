@@ -27,7 +27,7 @@ async def spy_check(user_name, img):
     
 
 async def accept(websocket, path):
-    cap, facial_detector = facialdetector.start()
+    #cap, facial_detector = facialdetector.start()
     current_exp = None
     onCamera = False
     isSpy = True
@@ -36,7 +36,8 @@ async def accept(websocket, path):
     user_name = user_name.strip()
     # print("receive: " + user_name)
 
-    facial_detector = start()
+    facial_detector = facialdetector.start()
+    cap = facial_detector.cap
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(facial_detector.run())
