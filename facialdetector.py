@@ -61,6 +61,8 @@ class FacialDetector:
         try:
             result = func(self.target_face)
             buf = np.array([result])
+            self.info[info_name] = result
+            
             print(result)
         except:
             result = None
