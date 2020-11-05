@@ -38,9 +38,6 @@ async def accept(websocket, path):
     facial_detector = facialdetector.start()
     cap = facial_detector.cap
 
-    #loop = asyncio.get_event_loop()
-    #loop.run_until_complete(facial_detector.run())
-
     asyncio.ensure_future(facial_detector.run())
 
     while True:
@@ -56,7 +53,9 @@ async def accept(websocket, path):
             stringImg = imgencode.tobytes()
             
             # spy_check doesn't work with late response
-            isSpy = await spy_check(user_name, stringImg)
+            # Uncomment below line and comment isSpy = False for Faical auth server http request
+            # isSpy = await spy_check(user_name, stringImg)
+            isSpy = False
 
             try:
                 msg = {'type':'spy', 'data': {'img': "spy"}}
@@ -71,7 +70,10 @@ async def accept(websocket, path):
 
         if facial_detector.updated == True:
             try:
-                msg = {'type': 'exp', 'data': {'absence': result["absence"], 'expression': result["expression"], 'eye_dir': result["eye_dir"], 'sleepiness': result["sleepiness"], 'isSpy': isSpy}}
+                exp = "sleepy"
+                if result["sleepiness"] == "awake":
+                    exp = result["expression"]
+                msg = {'absence': result["absence"], 'expression': exp, 'eye_dir': result["eye_dir"], 'isSpy': isSpy}
 
                 print(msg)
 

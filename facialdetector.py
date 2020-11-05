@@ -44,7 +44,7 @@ class FacialDetector:
         self.face_buffer = []
         self.info = {"absence": None, "expression": None, "eye_dir": None, "sleepiness": None}
 
-        self.updated = True
+        self.updated = False
 
 
         self.exp_labels = ('happy', 'neutral') #('angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral')
@@ -80,7 +80,7 @@ class FacialDetector:
                         buf = buf[buf!=result]
                         result = current_result
 
-                        print(current_result)
+                        # print(current_result)
                         self.updated = True
 
                     self.info[info_name] = result
@@ -152,7 +152,7 @@ class FacialDetector:
     def detect_sleepy(self, face):
         try:
             y=self.compute_eye_ratio(face)
-            print(y)
+            # print(y)
         except:
             raise ValueError("detect_sleepy: No face detected")
 
@@ -175,7 +175,7 @@ class FacialDetector:
 
             await asyncio.sleep(timer)
 
-        print(s/buffer_size)
+        # print(s/buffer_size)
         return s / buffer_size
 
 
