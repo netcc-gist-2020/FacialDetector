@@ -150,6 +150,9 @@ class FacialDetector:
 
 
     def detect_sleepy(self, face):
+        if self.mean_eye_ratio == None:
+            raise ValueError
+
         try:
             y=self.compute_eye_ratio(face)
             # print(y)
@@ -176,24 +179,23 @@ class FacialDetector:
             await asyncio.sleep(timer)
 
         # print(s/buffer_size)
-        return s / buffer_size
+        self.mean_eye_ratio = s / buffer_size
 
 
     async def run(self):
         task_target = asyncio.ensure_future(self.find_target(0.1))
-
-
+        
         task_absence = asyncio.ensure_future(self.detect_timer(lambda x: "absence" if x==None else "present", 
                                                                 "absence", 3, 1))
 
         task_exp = asyncio.ensure_future(self.detect_timer(self.detect_expression, "expression", 5, 0.5))
 
-        task_gazing = asyncio.ensure_future(self.detect_timer(self.detect_gazing, "eye_dir", 5, 0.5))
+        task_gazing = asyncio.ensure_future(self.detect_timer(self.detect_headpose, "eye_dir", 5, 0.2))
 
-        self.mean_eye_ratio = await self.init_mean_eye_ratio(10, 0.2)
+        sleepy_init = asyncio.ensure_future(self.init_mean_eye_ratio(10, 0.2))
 
         task_sleepy = asyncio.ensure_future(self.detect_timer(self.detect_sleepy,"sleepiness", 3, 1))
-
+        
         while True:
             frame = self.cap.read()[1]
             self.set_frame(frame)
@@ -208,11 +210,10 @@ class FacialDetector:
                 break
 
 
+            print(self.info)
+
             await asyncio.sleep(0.1)
             #print(self.target_face, self.info)
-
-        #task_sleepy = asyncio.ensure_future(detect_timer(self.detect_sleepy, 10, 1.2))
-
 
         
 
@@ -285,7 +286,56 @@ class FacialDetector:
 
         return label
 
+    # reference : https://www.learnopencv.com/head-pose-estimation-using-opencv-and-dlib/
+    def detect_headpose(self, face):
+        if face == None:
+            raise ValueError("detect_headpose: No face detected")
 
+        landmarks = self.landmarker(self.gray, face)
+
+        image_points = np.array([
+                            [landmarks.part(33).x, landmarks.part(33).y],    # nose tip
+                            [landmarks.part(8).x, landmarks.part(8).y],     # chin
+                            [landmarks.part(36).x, landmarks.part(36).y],   # left eye left corner
+                            [landmarks.part(45).x, landmarks.part(45).y],   # right eye right corner
+                            [landmarks.part(48).x, landmarks.part(48).y],   # left mouth corner
+                            [landmarks.part(54).x, landmarks.part(54).y]    # right mouth corner
+                            ], dtype="double")
+        model_points = np.array([
+                            [0.0, 0.0, 0.0],             # Nose tip
+                            [0.0, -330.0, -65.0],        # Chin
+                            [-225.0, 170.0, -135.0],     # Left eye left corner
+                            [225.0, 170.0, -135.0],      # Right eye right corne
+                            [-150.0, -150.0, -125.0],    # Left Mouth corner
+                            [150.0, -150.0, -125.0]      # Right mouth corner
+                            ])
+
+        size = self.gray.shape
+        
+        # Camera internals
+        focal_length = size[1]
+        center = (size[1]/2, size[0]/2)
+        camera_matrix = np.array(
+                         [[focal_length, 0, center[0]],
+                         [0, focal_length, center[1]],
+                         [0, 0, 1]], 
+                         dtype = "double")
+
+        dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
+        
+        (success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix, dist_coeffs)
+
+        (nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 0.0, 1500.0)]), rotation_vector, translation_vector, camera_matrix, dist_coeffs)
+
+        nose_end_point2D = nose_end_point2D.squeeze()
+        print(nose_end_point2D)
+
+        if nose_end_point2D[0] < 0:
+            return "left"
+        elif nose_end_point2D[0] > size[0]:
+            return "right"
+        else:
+            return "center"
 
     def detect_gazing(self, face):
         if face == None:
@@ -435,6 +485,7 @@ if __name__ == "__main__":
     facial_detector = start()
 
     loop = asyncio.get_event_loop()
+    print("test1")
     loop.run_until_complete(facial_detector.run())
     
 
