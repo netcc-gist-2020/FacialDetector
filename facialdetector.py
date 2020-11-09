@@ -90,6 +90,61 @@ class FacialDetector:
                 pass
             await asyncio.sleep(sleeptime)
 
+    async def init_face_descriptor(self, face):
+        self.target_face_descriptor = await self.get_descriptor(face)
+        
+        
+
+    async def get_descriptor(self, face):
+        landmarks = self.landmarker(self.gray, face)
+        face_descriptor = self.facerec.compute_face_descriptor(self.frame, landmarks)
+
+        return face_descriptor
+
+
+
+    async def compare_face_target(self, face):
+        if face == None:
+            raise ValueError("compare_face_target: target_face is None")
+
+        desc = await self.get_descriptor(face)
+        try:
+            dist = np.linalg.norm(np.array(desc) - np.array(self.target_face_descriptor))
+
+            if dist < 0.4:
+                # True
+                self.face_buffer.append((1, dist, face, desc))
+                return True
+
+            else:
+                # False
+                self.face_buffer.append((0, dist, face, desc))
+                return False
+        except:
+            return True
+
+
+    async def compare_face_target_monitor(self, timer, full):
+        while True:
+            if len(self.face_buffer) > 0:
+                best_face_info = sorted(self.face_buffer, key = lambda x: (-x[0], x[1]))[0]
+
+                if best_face_info[0] == 1:
+                    face = best_face_info[2]
+                    desc = best_face_info[3]
+
+                    #self.target_face_descriptor = desc     # don't touch this
+                    return face
+
+                elif len(self.face_buffer) == full:
+                    # no matching face found
+
+                    return None
+
+
+            await asyncio.sleep(timer)
+
+    
 
 
     async def find_target(self, timer):
@@ -183,14 +238,14 @@ class FacialDetector:
 
 
     async def run(self):
-        task_target = asyncio.ensure_future(self.find_target(0.1))
+        task_target = asyncio.ensure_future(self.find_target(0.05))
         
         task_absence = asyncio.ensure_future(self.detect_timer(lambda x: "absence" if x==None else "present", 
                                                                 "absence", 3, 1))
 
         task_exp = asyncio.ensure_future(self.detect_timer(self.detect_expression, "expression", 5, 0.5))
 
-        task_gazing = asyncio.ensure_future(self.detect_timer(self.detect_headpose, "eye_dir", 5, 0.2))
+        task_gazing = asyncio.ensure_future(self.detect_timer(self.detect_headpose, "eye_dir", 3, 0.1))
 
         sleepy_init = asyncio.ensure_future(self.init_mean_eye_ratio(10, 0.2))
 
@@ -212,57 +267,12 @@ class FacialDetector:
 
             print(self.info)
 
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.05)
             #print(self.target_face, self.info)
 
         
 
-    async def compare_face_target_monitor(self, timer, full):
-        while True:
-            if len(self.face_buffer) > 0:
-                best_face_info = sorted(self.face_buffer, key = lambda x: (-x[0], x[1]))[0]
-
-                if best_face_info[0] == 1:
-                    face = best_face_info[2]
-                    desc = best_face_info[3]
-
-                    #self.target_face_descriptor = desc     # don't touch this
-                    return face
-
-                elif len(self.face_buffer) == full:
-                    # no matching face found
-
-                    return None
-
-
-            await asyncio.sleep(timer)
-
-    async def compare_face_target(self, face):
-        if face == None:
-            raise ValueError("compare_face_target: target_face is None")
-
-        desc = await self.get_descriptor(face)
-        dist = np.linalg.norm(np.array(desc) - np.array(self.target_face_descriptor))
-
-        if dist < 0.4:
-            # True
-            self.face_buffer.append((1, dist, face, desc))
-            return True
-
-        else:
-            # False
-            self.face_buffer.append((0, dist, face, desc))
-            return False
-
-    async def get_descriptor(self, face):
-        landmarks = self.landmarker(self.gray, face)
-        face_descriptor = self.facerec.compute_face_descriptor(self.frame, landmarks)
-
-        return face_descriptor
-
-
-    async def init_face_descriptor(self, face):
-        self.target_face_descriptor = await self.get_descriptor(face)
+    
 
 
     def detect_expression(self, face):
@@ -325,7 +335,7 @@ class FacialDetector:
         
         (success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix, dist_coeffs)
 
-        (nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 0.0, 500.0)]), rotation_vector, translation_vector, camera_matrix, dist_coeffs)
+        (nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 0.0, 900.0)]), rotation_vector, translation_vector, camera_matrix, dist_coeffs)
 
         nose_end_point2D = nose_end_point2D.squeeze()
         nose_end_point2D -= np.array([face.left()*0.5+face.right()*0.5, face.bottom()*0.5+face.top()*0.5])
