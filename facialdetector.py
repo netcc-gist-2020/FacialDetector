@@ -96,7 +96,7 @@ class FacialDetector:
 
         while True:
 
-            if self.target_face != None:
+            if False: #self.target_face != None:
                 # local search around previous target face
                 face = self.target_face
                 d = 300
@@ -325,14 +325,16 @@ class FacialDetector:
         
         (success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix, dist_coeffs)
 
-        (nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 0.0, 1500.0)]), rotation_vector, translation_vector, camera_matrix, dist_coeffs)
+        (nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 0.0, 500.0)]), rotation_vector, translation_vector, camera_matrix, dist_coeffs)
 
         nose_end_point2D = nose_end_point2D.squeeze()
+        nose_end_point2D -= np.array([face.left()*0.5+face.right()*0.5, face.bottom()*0.5+face.top()*0.5])
+        w = face.right() - face.left()
         print(nose_end_point2D)
 
-        if nose_end_point2D[0] < 0:
+        if nose_end_point2D[0] < -w*0.5:
             return "left"
-        elif nose_end_point2D[0] > size[0]:
+        elif nose_end_point2D[0] > w*0.5:
             return "right"
         else:
             return "center"
