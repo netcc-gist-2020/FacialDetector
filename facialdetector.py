@@ -265,16 +265,11 @@ class FacialDetector:
                 break
 
 
-            print(self.info)
+            #print(self.info)
 
             await asyncio.sleep(0.05)
             #print(self.target_face, self.info)
-
         
-
-    
-
-
     def detect_expression(self, face):
         if face == None:
             raise ValueError("detect_expression: target_face is None")
@@ -340,7 +335,7 @@ class FacialDetector:
         nose_end_point2D = nose_end_point2D.squeeze()
         nose_end_point2D -= np.array([face.left()*0.5+face.right()*0.5, face.bottom()*0.5+face.top()*0.5])
         w = face.right() - face.left()
-        print(nose_end_point2D)
+        # print(nose_end_point2D)
 
         if nose_end_point2D[0] < -w*0.5:
             return "left"

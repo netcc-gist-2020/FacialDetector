@@ -57,8 +57,8 @@ async def accept(websocket, path):
             
             # spy_check doesn't work with late response
             # Uncomment below line and comment isSpy = False for Faical auth server http request
-            isSpy = await spy_check(user_name, stringImg)
-            # isSpy = False
+            # isSpy = await spy_check(user_name, stringImg)
+            isSpy = False
 
             try:
                 msg = {'type':'spy', 'data': {'img': "spy"}}
