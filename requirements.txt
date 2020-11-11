@@ -1,6 +1,8 @@
+scikit-build
 websockets
 tensorflow
 opencv-python
 dlib
 keras
 numpy
+matplotlib

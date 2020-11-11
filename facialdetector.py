@@ -73,8 +73,6 @@ class FacialDetector:
         while True:
             try:
                 current_result = func(self.target_face)
-                if info_name=="expression":
-                    print(current_result)
 
                 buf = np.append(buf, current_result)
                 buf = buf[-buffer_size:]
@@ -83,6 +81,7 @@ class FacialDetector:
                     if np.sum(buf == current_result) > np.sum(buf == result):
                         buf = buf[buf!=result]
                         result = current_result
+                        
 
                         # print(current_result)
                         self.updated = True
@@ -276,6 +275,7 @@ class FacialDetector:
         while True:
             frame = self.cap.read()[1]
             self.set_frame(frame)
+                # print(result)
 
             if self.target_face != None:
                 cv2.rectangle(self.frame, tuple([self.target_face.left(), self.target_face.top()]), tuple([self.target_face.right(), self.target_face.bottom()]), (255, 0, 0), 1)
@@ -293,7 +293,7 @@ class FacialDetector:
                 break
 
 
-            print(self.info)
+            # print(self.info)
 
             await asyncio.sleep(0.05)
             #print(self.target_face, self.info)
@@ -372,7 +372,7 @@ class FacialDetector:
 
         nose_end_point2D -= np.array([face.left()*0.5+face.right()*0.5, face.bottom()*0.5+face.top()*0.5])
         w = face.right() - face.left()
-        print(nose_end_point2D)
+        # print(nose_end_point2D)
 
         if nose_end_point2D[0] < -w*0.7:
             return "left"
