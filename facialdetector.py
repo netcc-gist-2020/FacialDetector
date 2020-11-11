@@ -46,6 +46,8 @@ class FacialDetector:
 
         self.updated = False
 
+        self.nosetip = np.zeros((2))
+
 
         self.exp_labels = ('happy', 'neutral') #('angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral')
 
@@ -71,6 +73,8 @@ class FacialDetector:
         while True:
             try:
                 current_result = func(self.target_face)
+                if info_name=="expression":
+                    print(current_result)
 
                 buf = np.append(buf, current_result)
                 buf = buf[-buffer_size:]
@@ -144,21 +148,37 @@ class FacialDetector:
 
             await asyncio.sleep(timer)
 
-    
+    def detect_faces(self, frame):
+        h, w = frame.shape[:2]
+        blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 1.0, (300, 300), (104.0, 117.0, 123.0))
+        self.detector.setInput(blob)
+        result = self.detector.forward()
+
+        faces = []
+
+        for i in range(result.shape[2]):
+            confidence = result[0, 0, i, 2]
+            if confidence > 0.5:
+                box = result[0, 0, i, 3:7] * np.array([w, h, w, h])
+                (x, y, x1, y1) = box.astype("int")
+
+                faces.append(dlib.rectangle(x, y, x1, y1))
+
+        return faces
 
 
     async def find_target(self, timer):
 
         while True:
 
-            if False: #self.target_face != None:
+            if False:#self.target_face != None:
                 # local search around previous target face
                 face = self.target_face
                 d = 300
                 hrange = range(max(face.top()-d,0), min(face.bottom()+d,self.gray.shape[0]))
                 wrange = range(max(face.left()-d,0), min(face.right()+d,self.gray.shape[1]))
 
-                faces = self.detector(self.gray[hrange][:,wrange])
+                faces = self.detect_faces(self.frame[hrange][:,wrange]) #self.detector(self.gray[hrange][:,wrange])
 
                 if len(faces) == 0:
                     # go for global search
@@ -174,10 +194,10 @@ class FacialDetector:
                 # global search
                 #print("global search.")
 
-                faces = self.detector(self.gray)
-                tasks = []
+                #faces = self.detector(self.gray)
 
-                if len(faces) == 1:
+                faces = self.detect_faces(self.frame)
+                if len(faces) >= 1: #len(faces) == 1:
                     face = faces[0]
                     self.target_face = face
 
@@ -185,14 +205,16 @@ class FacialDetector:
                         self.target_face_descriptor = await get_descriptor(face)
                     except:
                         pass
-                    
+                
 
                 elif len(faces) > 0:
 
-                    for face in faces:
-                        tasks.append(asyncio.ensure_future(compare_face_target(face)))
+                    tasks = []
 
-                    task_monitor = asyncio.ensure_future(compare_face_target_monitor(0.33*timer, len(faces)))
+                    for face in faces:
+                        tasks.append(asyncio.ensure_future(self.compare_face_target(face)))
+
+                    task_monitor = asyncio.ensure_future(self.compare_face_target_monitor(0.33*timer, len(faces)))
                     self.target_face = await task_monitor
 
                     for task in tasks:
@@ -238,14 +260,14 @@ class FacialDetector:
 
 
     async def run(self):
-        task_target = asyncio.ensure_future(self.find_target(0.05))
+        task_target = asyncio.ensure_future(self.find_target(0.1))
         
         task_absence = asyncio.ensure_future(self.detect_timer(lambda x: "absence" if x==None else "present", 
                                                                 "absence", 3, 1))
 
-        task_exp = asyncio.ensure_future(self.detect_timer(self.detect_expression, "expression", 5, 0.5))
+        task_exp = asyncio.ensure_future(self.detect_timer(self.detect_expression, "expression", 3, 0.2))
 
-        task_gazing = asyncio.ensure_future(self.detect_timer(self.detect_headpose, "eye_dir", 3, 0.1))
+        task_gazing = asyncio.ensure_future(self.detect_timer(self.detect_headpose, "eye_dir", 4, 0.4))
 
         sleepy_init = asyncio.ensure_future(self.init_mean_eye_ratio(10, 0.2))
 
@@ -257,7 +279,13 @@ class FacialDetector:
 
             if self.target_face != None:
                 cv2.rectangle(self.frame, tuple([self.target_face.left(), self.target_face.top()]), tuple([self.target_face.right(), self.target_face.bottom()]), (255, 0, 0), 1)
+                landmarks = self.landmarker(self.gray, self.target_face)
+
+                for i in [33, 8, 36, 45, 60, 64]:
+                    cv2.circle(self.frame, (landmarks.part(i).x, landmarks.part(i).y), 3, (255,0,0), 10)
             
+            cv2.circle(self.frame, tuple(self.nosetip.astype(int)), 3, (0,255,0), 10)
+
             cv2.imshow("Frame", self.frame)
             key = cv2.waitKey(1)
 
@@ -265,11 +293,16 @@ class FacialDetector:
                 break
 
 
-            #print(self.info)
+            print(self.info)
 
             await asyncio.sleep(0.05)
             #print(self.target_face, self.info)
+
         
+
+    
+
+
     def detect_expression(self, face):
         if face == None:
             raise ValueError("detect_expression: target_face is None")
@@ -303,8 +336,8 @@ class FacialDetector:
                             [landmarks.part(8).x, landmarks.part(8).y],     # chin
                             [landmarks.part(36).x, landmarks.part(36).y],   # left eye left corner
                             [landmarks.part(45).x, landmarks.part(45).y],   # right eye right corner
-                            [landmarks.part(48).x, landmarks.part(48).y],   # left mouth corner
-                            [landmarks.part(54).x, landmarks.part(54).y]    # right mouth corner
+                            [landmarks.part(60).x, landmarks.part(60).y],   # left mouth corner
+                            [landmarks.part(64).x, landmarks.part(64).y]    # right mouth corner
                             ], dtype="double")
         model_points = np.array([
                             [0.0, 0.0, 0.0],             # Nose tip
@@ -314,6 +347,7 @@ class FacialDetector:
                             [-150.0, -150.0, -125.0],    # Left Mouth corner
                             [150.0, -150.0, -125.0]      # Right mouth corner
                             ])
+
 
         size = self.gray.shape
         
@@ -328,18 +362,21 @@ class FacialDetector:
 
         dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
         
-        (success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix, dist_coeffs)
+        (success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
 
-        (nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 0.0, 900.0)]), rotation_vector, translation_vector, camera_matrix, dist_coeffs)
+        (nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 0.0, 500.0)]), rotation_vector, translation_vector, camera_matrix, dist_coeffs)
 
         nose_end_point2D = nose_end_point2D.squeeze()
+
+        self.nosetip = np.copy(nose_end_point2D)
+
         nose_end_point2D -= np.array([face.left()*0.5+face.right()*0.5, face.bottom()*0.5+face.top()*0.5])
         w = face.right() - face.left()
-        # print(nose_end_point2D)
+        print(nose_end_point2D)
 
-        if nose_end_point2D[0] < -w*0.5:
+        if nose_end_point2D[0] < -w*0.7:
             return "left"
-        elif nose_end_point2D[0] > w*0.5:
+        elif nose_end_point2D[0] > w*0.7:
             return "right"
         else:
             return "center"
@@ -459,13 +496,22 @@ def start():
 
     cap = cv2.VideoCapture(0)
 
-    detector = dlib.get_frontal_face_detector()
-    landmarker = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
-    #exp_classifier = load_model('model_v6_23.hdf5')
-    exp_classifier = model_from_json(open("facial_expression_model_structure.json", "r").read())
-    exp_classifier.load_weights('facial_expression_model_weights.h5')
+    #detector = dlib.get_frontal_face_detector()
+    modelFile = "models/opencv_face_detector.caffemodel"
+    configFile = "models/opencv_face_detector.prototxt.txt"
 
-    facerec = dlib.face_recognition_model_v1('dlib_face_recognition_resnet_model_v1.dat')
+    detector = cv2.dnn.readNetFromCaffe(configFile, modelFile)
+
+    landmarker = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
+    #exp_classifier = load_model('model_v6_23.hdf5')
+
+    #exp_classifier = model_from_json(open("models/facial_expression_model_structure.json", "r").read())
+    #exp_classifier.load_weights('models/facial_expression_model_weights.h5')
+    
+    exp_classifier = model_from_json(open("models/model.json", "r").read())
+    exp_classifier.load_weights('models/weights.h5')
+
+    facerec = dlib.face_recognition_model_v1('models/dlib_face_recognition_resnet_model_v1.dat')
 
     facial_detector = FacialDetector(detector=detector, landmarker=landmarker, exp_classifier=exp_classifier, facerec=facerec, cap=cap)
 
