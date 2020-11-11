@@ -79,7 +79,7 @@ async def accept(websocket, path):
                         exp = "neutral"
                     else:
                         exp = "sleepy"
-                msg = {'absence': result["absence"], 'expression': exp, 'eye_dir': result["eye_dir"], 'isSpy': isSpy}
+                msg = {'absence': False if result["absence"]=="present" else True, 'expression': exp, 'eye_dir': result["eye_dir"], 'isSpy': isSpy}
 
                 print(msg)
 
