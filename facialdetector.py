@@ -73,6 +73,8 @@ class FacialDetector:
         while True:
             try:
                 current_result = func(self.target_face)
+                if info_name=="expression":
+                    print(current_result)
 
                 buf = np.append(buf, current_result)
                 buf = buf[-buffer_size:]
@@ -195,7 +197,7 @@ class FacialDetector:
                 #faces = self.detector(self.gray)
 
                 faces = self.detect_faces(self.frame)
-                if len(faces) == 1:
+                if len(faces) >= 1: #len(faces) == 1:
                     face = faces[0]
                     self.target_face = face
 
@@ -206,12 +208,13 @@ class FacialDetector:
                 
 
                 elif len(faces) > 0:
+
                     tasks = []
 
                     for face in faces:
-                        tasks.append(asyncio.ensure_future(compare_face_target(face)))
+                        tasks.append(asyncio.ensure_future(self.compare_face_target(face)))
 
-                    task_monitor = asyncio.ensure_future(compare_face_target_monitor(0.33*timer, len(faces)))
+                    task_monitor = asyncio.ensure_future(self.compare_face_target_monitor(0.33*timer, len(faces)))
                     self.target_face = await task_monitor
 
                     for task in tasks:
@@ -262,9 +265,9 @@ class FacialDetector:
         task_absence = asyncio.ensure_future(self.detect_timer(lambda x: "absence" if x==None else "present", 
                                                                 "absence", 3, 1))
 
-        task_exp = asyncio.ensure_future(self.detect_timer(self.detect_expression, "expression", 5, 0.5))
+        task_exp = asyncio.ensure_future(self.detect_timer(self.detect_expression, "expression", 3, 0.2))
 
-        task_gazing = asyncio.ensure_future(self.detect_timer(self.detect_headpose, "eye_dir", 5, 0.2))
+        task_gazing = asyncio.ensure_future(self.detect_timer(self.detect_headpose, "eye_dir", 4, 0.4))
 
         sleepy_init = asyncio.ensure_future(self.init_mean_eye_ratio(10, 0.2))
 
@@ -276,8 +279,12 @@ class FacialDetector:
 
             if self.target_face != None:
                 cv2.rectangle(self.frame, tuple([self.target_face.left(), self.target_face.top()]), tuple([self.target_face.right(), self.target_face.bottom()]), (255, 0, 0), 1)
+                landmarks = self.landmarker(self.gray, self.target_face)
+
+                for i in [33, 8, 36, 45, 60, 64]:
+                    cv2.circle(self.frame, (landmarks.part(i).x, landmarks.part(i).y), 3, (255,0,0), 10)
             
-            cv2.circle(self.frame, tuple(self.nosetip.astype(int)), 3, (255,0,0), 10)
+            cv2.circle(self.frame, tuple(self.nosetip.astype(int)), 3, (0,255,0), 10)
 
             cv2.imshow("Frame", self.frame)
             key = cv2.waitKey(1)
@@ -341,6 +348,7 @@ class FacialDetector:
                             [150.0, -150.0, -125.0]      # Right mouth corner
                             ])
 
+
         size = self.gray.shape
         
         # Camera internals
@@ -354,7 +362,7 @@ class FacialDetector:
 
         dist_coeffs = np.zeros((4,1)) # Assuming no lens distortion
         
-        (success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix, dist_coeffs)
+        (success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
 
         (nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 0.0, 500.0)]), rotation_vector, translation_vector, camera_matrix, dist_coeffs)
 
@@ -491,11 +499,17 @@ def start():
     #detector = dlib.get_frontal_face_detector()
     modelFile = "models/opencv_face_detector.caffemodel"
     configFile = "models/opencv_face_detector.prototxt.txt"
+
     detector = cv2.dnn.readNetFromCaffe(configFile, modelFile)
+
     landmarker = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
     #exp_classifier = load_model('model_v6_23.hdf5')
-    exp_classifier = model_from_json(open("models/facial_expression_model_structure.json", "r").read())
-    exp_classifier.load_weights('models/facial_expression_model_weights.h5')
+
+    #exp_classifier = model_from_json(open("models/facial_expression_model_structure.json", "r").read())
+    #exp_classifier.load_weights('models/facial_expression_model_weights.h5')
+    
+    exp_classifier = model_from_json(open("models/model.json", "r").read())
+    exp_classifier.load_weights('models/weights.h5')
 
     facerec = dlib.face_recognition_model_v1('models/dlib_face_recognition_resnet_model_v1.dat')
 
