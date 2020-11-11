@@ -57,8 +57,8 @@ async def accept(websocket, path):
             
             # spy_check doesn't work with late response
             # Uncomment below line and comment isSpy = False for Faical auth server http request
-            # isSpy = await spy_check(user_name, stringImg)
-            isSpy = False
+            isSpy = await spy_check(user_name, stringImg)
+            # isSpy = False
 
             try:
                 msg = {'type':'spy', 'data': {'img': "spy"}}
@@ -73,9 +73,12 @@ async def accept(websocket, path):
 
         if facial_detector.updated == True:
             try:
-                exp = "sleepy"
-                if result["sleepiness"] == "awake":
-                    exp = result["expression"]
+                exp = "happy"
+                if result["expression"] == "neutral":
+                    if result["sleepiness"] == "awake":
+                        exp = "neutral"
+                    else:
+                        exp = "sleepy"
                 msg = {'absence': result["absence"], 'expression': exp, 'eye_dir': result["eye_dir"], 'isSpy': isSpy}
 
                 print(msg)
