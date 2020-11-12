@@ -42,7 +42,7 @@ class FacialDetector:
 
 
         self.face_buffer = []
-        self.info = {"absence": None, "expression": None, "eye_dir": None, "sleepiness": None}
+        self.info = {"absence": "present", "expression": "neutral", "eye_dir": "center", "sleepiness": "awake"}
 
         self.updated = False
 

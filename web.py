@@ -60,14 +60,6 @@ async def accept(websocket, path):
             isSpy = await spy_check(user_name, stringImg)
             # isSpy = False
 
-            try:
-                msg = {'type':'spy', 'data': {'img': "spy"}}
-                print(msg)
-                await websocket.send(json.dumps(msg))
-            except TypeError:
-                print("type error")
-                pass
-
         elif result["absence"] == 'absence':
             onCamera = False
 
