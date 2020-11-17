@@ -17,7 +17,6 @@ async def spy_check(user_name, img):
     }
     try:
         response = requests.post(url=url, files= {"user-face":img}, data=params)
-        print(response.request.body)
     except requests.exceptions.RequestException as e:
         raise SystemExit(e)
     
