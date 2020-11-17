@@ -8,13 +8,16 @@ import requests
 
 async def spy_check(user_name, img):
     url = "http://116.89.189.53:8081/signin/face"
+    json_name = json.dumps({
+        'name': user_name
+    })
+
     params = {
-        "meta-data":  {
-            'name': user_name
-        }
+        "meta-data": json_name
     }
     try:
         response = requests.post(url=url, files= {"user-face":img}, data=params)
+        print(response.request.body)
     except requests.exceptions.RequestException as e:
         raise SystemExit(e)
     
